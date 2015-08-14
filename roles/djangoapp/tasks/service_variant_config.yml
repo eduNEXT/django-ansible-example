@@ -1,0 +1,94 @@
+- name: "create djangoapp application config"
+  template: >
+    src={{ item }}.env.yaml.j2
+    dest={{ djangoapp_app_dir }}/{{ item }}.env.yaml
+  sudo_user: "{{ djangoapp_user }}"
+  tags: djangoapp_cfg
+  with_items:
+  - djangoapp
+
+- name: "create djangoapp auth file"
+  template: >
+    src={{ item }}.auth.yaml.j2
+    dest={{ djangoapp_app_dir }}/{{ item }}.auth.yaml
+  sudo_user: "{{ djangoapp_user }}"
+  tags: djangoapp_cfg
+  with_items:
+  - djangoapp
+
+# write the supervisor scripts for the service variants
+- name: "writing djangoapp supervisor script"
+  template: >
+    src={{ item }}.conf.j2 dest={{ supervisor_available_dir }}/{{ item }}.conf
+    owner={{ supervisor_user }}
+    group={{ supervisor_user }}
+  with_items: djangoapp
+  sudo_user: "{{ supervisor_user }}"
+
+
+# Enable the supervisor jobs
+- name: "enable djangoapp supervisor script"
+  file: >
+    src={{ supervisor_available_dir }}/{{ item }}.conf
+    dest={{ supervisor_cfg_dir }}/{{ item }}.conf
+    state=link
+    force=yes
+  with_items: djangoapp
+  when: not disable_django_services
+  sudo_user: "{{ supervisor_user }}"
+
+- name: create helper scripts for managing djangoapp
+  template: >
+    src=django/bin/djangoapp-{{ item }}.j2
+    dest={{ COMMON_BIN_DIR }}/djangoapp-{{ item }}
+    owner={{ djangoapp_user }}
+    mode=0755
+  with_items:
+    - runserver
+
+- name: Create database of sites
+  mysql_db: >
+    name="{{ DJANGOAPP_MYSQL_DB_NAME }}"
+    state=present
+    login_host="{{ DJANGOAPP_MYSQL_HOST | default('localhost') }}"
+    login_user="{{ mysql_user }}"
+    login_password="{{ mysql_root_password }}"
+  when: create_db is defined and create_db|lower == "yes"
+
+- name: Create/assign database user to db and grant permissions
+  mysql_user: >
+    name="{{ DJANGOAPP_MYSQL_USER }}"
+    password="{{ DJANGOAPP_MYSQL_PASSWORD }}"
+    priv="{{ DJANGOAPP_MYSQL_DB_NAME }}.*:ALL"
+    state=present
+    login_host="{{ DJANGOAPP_MYSQL_HOST | default('localhost') }}"
+    login_user="{{ mysql_user }}"
+    login_password="{{ mysql_root_password }}"
+  when: create_db is defined and create_db|lower == "yes"
+
+# Syncdb with migrate when the migrate user is overridden in extra vars
+- name: syncdb and migrate
+  shell: >
+    chdir={{ djangoapp_code_dir }}
+    {{ djangoapp_venv_bin}}/python manage.py migrate --settings={{ DJANGOAPP_SETTINGS }}
+  when: fake_migrations is not defined and migrate_db is defined and migrate_db|lower == "yes"
+  sudo_user: "{{ djangoapp_user }}"
+  tags:
+  - migrate
+
+# About here would be a good moment to run npm and bower
+
+# Collect statics the old way
+- name: run collectstatic
+  shell: >
+    chdir={{ djangoapp_code_dir }}
+    {{ djangoapp_venv_bin }}/python manage.py collectstatic --noinput --settings={{ DJANGOAPP_SETTINGS }}
+  sudo_user: "{{ djangoapp_user }}"
+  environment: "{{ djangoapp_environment }}"
+
+- name: run compress
+  shell: >
+    chdir={{ djangoapp_code_dir }}
+    {{ djangoapp_venv_bin }}/python manage.py compress --force --settings={{ DJANGOAPP_SETTINGS }}
+  sudo_user: "{{ djangoapp_user }}"
+  environment: "{{ djangoapp_environment }}"

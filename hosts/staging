@@ -1,0 +1,5 @@
+[web]
+your_staging_host
+
+[staging:children]
+web

@@ -1,0 +1,97 @@
+- name: setup the djangoapp env
+  template: >
+    src="djangoapp_env.j2" dest="{{ djangoapp_app_dir }}/djangoapp_env"
+    owner="{{ djangoapp_user }}" group="{{ common_web_user }}"
+    mode=0644
+  tags: fmo
+
+- name: install read-only ssh key
+  copy: >
+    dest="{{ djangoapp_app_dir }}/.ssh/deploy_read_only_key"
+    src="{{ djangoapp_deployment_ssh_key }}" owner={{ djangoapp_user }}
+    group={{ djangoapp_user }} mode=0600
+
+- name: checkout the code
+  git: >
+    dest="{{ djangoapp_code_dir }}" repo="{{ djangoapp_source_repo }}"
+    version="{{ djangoapp_version }}" accept_hostkey=yes
+    key_file="{{ djangoapp_app_dir }}/.ssh/deploy_read_only_key"
+  sudo_user: "{{ djangoapp_user }}"
+  register: djangoapp_checkout
+
+- name: install the requirements
+  pip: >
+    requirements="{{ djangoapp_requirements_file }}"
+    virtualenv="{{ djangoapp_venv_dir }}"
+    state=present
+    extra_args="-i {{ COMMON_PYPI_MIRROR_URL }}"
+  sudo_user: "{{ djangoapp_user }}"
+
+
+# creates the supervisor jobs for the
+# service variants configured, runs
+# gather_assets and db migrations
+- include: service_variant_config.yml
+  tags:
+    - service_variant_config
+    - deploy
+
+- name: update supervisor configuration
+  shell:  "{{ supervisor_ctl }} -c {{ supervisor_cfg }} update"
+  register: supervisor_update
+  sudo_user: "{{ supervisor_service_user }}"
+  changed_when: supervisor_update.stdout is defined and supervisor_update.stdout != ""
+  when: not disable_django_services
+
+- name: ensure djangoapp has started
+  supervisorctl_local: >
+    state=started
+    supervisorctl_path={{ supervisor_ctl }}
+    config={{ supervisor_cfg }}
+    name="djangoapp:"
+  sudo_user: "{{ supervisor_service_user }}"
+  when: celery_worker is not defined and not disable_django_services
+
+- name: create symlinks from the venv bin dir
+  file: >
+    src="{{ djangoapp_venv_bin }}/{{ item }}"
+    dest={{ COMMON_BIN_DIR }}/{{ item.split('.')[0] }}.djangoapp
+    state=link
+  with_items:
+  - python
+  - pip
+  - django-admin.py
+
+- name: create symlinks from the repo dir
+  file: >
+    src="{{ djangoapp_code_dir }}/{{ item }}"
+    dest={{ COMMON_BIN_DIR }}/{{ item.split('.')[0] }}.djangoapp
+    state=link
+  with_items:
+  - manage.py
+
+- name: remove read-only ssh key
+  file: >
+    path="{{ djangoapp_app_dir }}/.ssh/deploy_read_only_key"
+    state=absent
+
+- set_fact: djangoapp_installed=true
+
+- name: restart djangoapp
+  supervisorctl_local: >
+    state=restarted
+    supervisorctl_path={{ supervisor_ctl }}
+    config={{ supervisor_cfg }}
+    name="djangoapp"
+  when: djangoapp_installed is defined and celery_worker is not defined and not disable_django_services
+  sudo_user: "{{ supervisor_service_user }}"
+
+# - name: restart djangoapp_workers
+#   supervisorctl_local: >
+#     name="djangoapp_worker:{{ item.service_variant }}_{{ item.queue }}_{{ item.concurrency }}"
+#     supervisorctl_path={{ supervisor_ctl }}
+#     config={{ supervisor_cfg }}
+#     state=restarted
+#   when: djangoapp_installed is defined and celery_worker is defined and not disable_django_services
+#   with_items: djangoapp_workers
+#   sudo_user: "{{ common_web_user }}"

@@ -1,0 +1,84 @@
+---
+- name: Add Nginx PPA
+  apt_repository: repo="ppa:nginx/stable" update_cache=yes
+
+- name: Install Nginx
+  apt: name=nginx state=present force=yes
+
+- name: Grab h5bp/server-configs-nginx
+  git: repo="https://github.com/h5bp/server-configs-nginx.git"
+       dest=/tmp/server-configs-nginx
+       version="1.0.0"
+       force=yes
+
+- name: Copy over h5bp configuration
+  command: cp -r /tmp/server-configs-nginx/{{ item }} /etc/nginx/{{ item }}
+  with_items:
+    - mime.types
+    - h5bp/
+
+- name: Copy SSL conf files
+  copy: >
+      src="{{ item }}"
+      dest=/etc/nginx/{{ item | basename }} mode=644
+  with_fileglob: '*'
+
+- name: Create nginx.conf
+  template: src=nginx.conf.j2 dest=/etc/nginx/nginx.conf
+  notify: reload nginx
+
+- name: Disable default server
+  file: path=/etc/nginx/sites-enabled/default state=absent
+  notify: reload nginx
+
+- name: Enable better default site to drop unknown requests
+  command: cp /tmp/server-configs-nginx/sites-available/no-default /etc/nginx/sites-enabled/no-default.conf
+  notify: reload nginx
+
+# Extensions for the django services
+
+- name: create nginx app dirs
+  file: >
+    path="{{ item }}"
+    state=directory
+    owner="{{ nginx_user }}"
+    group="{{ common_web_group }}"
+  with_items:
+    - "{{ nginx_app_dir }}"
+    - "{{ nginx_sites_available_dir }}"
+    - "{{ nginx_sites_enabled_dir }}"
+    - "{{ nginx_conf_dir }}"
+  notify: restart nginx
+
+- name: create nginx data dirs
+  file: >
+    path="{{ item }}"
+    state=directory
+    owner="{{ common_web_user }}"
+    group="{{ nginx_user }}"
+  with_items:
+    - "{{ nginx_data_dir }}"
+    - "{{ nginx_log_dir }}"
+    - "{{ nginx_server_static_dir }}"
+  notify: restart nginx
+
+- name: Create nginx log file location (just in case)
+  file: >
+    path={{ nginx_log_dir}} state=directory
+    owner={{ common_web_user }} group={{ common_web_user }}
+
+- name: Copying nginx configs for nginx_sites
+  template: >
+    src={{ nginx_template_dir }}/{{ item }}.j2
+    dest={{ nginx_sites_available_dir }}/{{ item }}
+    owner=root group={{ common_web_user }} mode=0640
+  notify: reload nginx
+  with_items: nginx_sites
+
+- name: Creating nginx config links for {{ nginx_sites }}
+  file: >
+    src={{ nginx_sites_available_dir }}/{{ item  }}
+    dest={{ nginx_sites_enabled_dir }}/{{ item }}.conf
+    state=link owner=root group=root
+  notify: reload nginx
+  with_items: nginx_sites

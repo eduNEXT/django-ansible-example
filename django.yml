@@ -1,0 +1,16 @@
+---
+- name: "Deployment of django applications"
+  hosts: web
+  remote_user: "{{ web_user }}"
+  sudo: yes
+  vars:
+    create_db: "yes"
+    migrate_db: "yes"
+
+  roles:
+    - role: mariadb
+    - role: memcached
+    - role: nginx
+      nginx_sites:
+      - django
+    - role: djangoapp

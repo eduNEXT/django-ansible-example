@@ -1,0 +1,6 @@
+#Global ignored files
+build/
+.vagrant/
+
+secure/
+roles/_*

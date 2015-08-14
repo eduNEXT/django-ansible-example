@@ -1,0 +1,63 @@
+---
+- name: Update Apt
+  apt: update_cache=yes
+
+- name: locale
+  shell: >
+    export LANGUAGE=en_US.UTF-8;
+    export LANG=en_US.UTF-8;
+    export LC_ALL=en_US.UTF-8;
+    sudo update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8;
+
+- name: Update CA Certificates
+  shell: >
+    /usr/sbin/update-ca-certificates
+
+- name: Add user www-data
+  # This is the default user for nginx
+  user: >
+    name="{{ common_web_user }}"
+    shell=/bin/false
+
+- name: Create common directories
+  file: >
+    path={{ item }} state=directory owner=root
+    group=root mode=0755
+  with_items:
+    - "{{ COMMON_DATA_DIR }}"
+    - "{{ COMMON_APP_DIR }}"
+    - "{{ COMMON_BIN_DIR }}"
+    - "{{ COMMON_CFG_DIR }}"
+
+# Determine if machine is provisioned via vagrant
+# Some EC2-specific steps would need to be skipped
+- name: check if instance is vagrant
+  stat: path=/home/vagrant
+  register: vagrant_home_dir
+
+# Need to install python-pycurl to use Ansible's apt_repository module
+- name: Install python-pycurl
+  apt: pkg=python-pycurl state=present update_cache=no
+
+- name: Install role-independent useful system packages
+  # do this before log dir setup; rsyslog package guarantees syslog user present
+  apt: >
+    pkg={{','.join(common_debian_pkgs)}} install_recommends=yes
+    state=present update_cache=no
+
+- name: Create common log directory
+  file: >
+    path={{ COMMON_LOG_DIR }} state=directory owner=syslog
+    group=syslog mode=0755
+
+- name: Create common pip directory
+  file: >
+    path={{ COMMON_PIP_DIR }} state=directory owner=root
+    group=syslog mode=0777
+
+- name: pip install virtualenv
+  pip: >
+    name="{{ item }}" state=present
+    extra_args="-i {{ COMMON_PYPI_MIRROR_URL }}"
+  with_items: common_pip_pkgs
+

@@ -1,0 +1,62 @@
+---
+#
+# eduNEXT Configuration
+#
+#
+#
+#
+# Tasks for role kproxyapp
+#
+# Overview:
+#
+#
+# Dependencies:
+#
+#
+# Example play:
+#
+#
+
+- name: create application user
+  user: >
+    name="{{ djangoapp_user }}" home="{{ djangoapp_app_dir }}"
+    createhome=no shell=/bin/false
+
+- name: create djangoapp user dirs
+  file: >
+    path="{{ item }}" state=directory
+    owner="{{ djangoapp_user }}" group="{{ common_web_group }}"
+  with_items:
+    - "{{ djangoapp_app_dir }}"
+    - "{{ djangoapp_venvs_dir }}"
+    - "{{ djangoapp_app_dir }}/.ssh"
+    - "{{ djangoapp_data_dir }}"
+
+- name: create djangoapp log files
+  file: >
+    path="{{ djangoapp_main_log_path }}" state=touch
+    owner="{{ djangoapp_user }}" group="{{ common_web_group }}"
+
+- name: Install necessary system packages
+  apt: >
+    pkg={{','.join(djangoapp_pkgs)}} install_recommends=yes
+    state=present update_cache=no
+
+- include: deploy.yml tags=deploy
+
+
+##### For dev only #####
+
+- name: set login shell for app accounts
+  user: name={{ item.user }} shell="/bin/bash"
+  with_items: djangoapp_localdev_accounts
+  when: shell_users
+
+
+- name: create login scripts
+  template:
+    src=app_bashrc.j2 dest={{ item.home }}/.bashrc
+    owner={{ item.user }} mode=755
+  with_items: djangoapp_localdev_accounts
+  when: shell_users
+  ignore_errors: yes

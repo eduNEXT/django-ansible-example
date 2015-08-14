@@ -1,0 +1,21 @@
+---
+apt_cache_valid_time: 86400
+mariadb_dist: trusty
+mysql_user: root
+
+web_user: web
+web_group: www-data
+web_sudoers:
+  - "/usr/sbin/service nginx *"
+
+sudoers:
+  - user: admin
+    groups: [sudo]
+
+shell_users: false
+
+
+secure_dir: '../../../secure'
+
+mysql_root_password: devpw
+

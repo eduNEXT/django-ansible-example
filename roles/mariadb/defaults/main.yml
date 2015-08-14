@@ -1,0 +1,6 @@
+keyserver_fingerprint: "0xcbcb082a1bb943db"
+mirror: nyc2.mirrors.digitalocean.com
+version: "10.0"
+
+apt_pkgs:
+  - python-mysqldb

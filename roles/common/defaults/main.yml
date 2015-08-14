@@ -1,0 +1,72 @@
+
+# Override these variables
+# to change the base directory
+
+
+COMMON_BASE_DIR: /django
+COMMON_DATA_DIR: "{{ COMMON_BASE_DIR}}/var"
+COMMON_APP_DIR: "{{ COMMON_BASE_DIR}}/app"
+COMMON_LOG_DIR: "{{ COMMON_DATA_DIR }}/log"
+# Override this to create
+# common users in all roles
+COMMON_USER_INFO: []
+# these directories contain
+# symlinks for convenience
+COMMON_BIN_DIR: "{{ COMMON_BASE_DIR }}/bin"
+COMMON_CFG_DIR: "{{ COMMON_BASE_DIR }}/etc"
+COMMON_PIP_DIR: "{{ COMMON_DATA_DIR }}/.pip"
+
+COMMON_ENVIRONMENT: 'default_env'
+COMMON_DEPLOYMENT: 'default_deployment'
+COMMON_PYPI_MIRROR_URL: 'https://pypi.python.org/simple'
+COMMON_NPM_MIRROR_URL: 'http://registry.npmjs.org'
+COMMON_UBUNTU_APT_KEYSERVER: "http://keyserver.ubuntu.com/pks/lookup?op=get&fingerprint=on&search="
+# override this var to set a different hostname
+COMMON_HOSTNAME: ""
+
+
+common_boto_version: '2.34.0'
+common_debian_pkgs:
+  - ntp
+  - ack-grep
+  - lynx-cur
+  - logrotate
+  - mosh
+  - rsyslog
+  - screen
+  - tmux
+  - tree
+  - git
+  - unzip
+  - python2.7
+  - python-pip
+  - python2.7-dev
+  - python-software-properties
+  - python-mysqldb
+  - build-essential
+  - curl
+
+
+common_pip_pkgs:
+  - pip==7.0.3
+  - setuptools==17.1.1
+  - virtualenv==13.0.3
+  - virtualenvwrapper==4.6.0
+
+common_web_user: www-data
+common_web_group: www-data
+common_log_user: syslog
+
+common_git_ppa: "ppa:git-core/ppa"
+
+# Skip supervisor tasks
+# When set to true this flag will allow you to install everything but keep
+# supervisor from starting any of the services.
+# Service files will be placed in supervisor's conf.available.d but not linked
+# to supervisors 'conf.d' directory.
+disable_django_services: False
+
+
+# Some cluster apps need special settings when in vagrant
+# due to eth0 always being the same IP address
+vagrant_cluster: False

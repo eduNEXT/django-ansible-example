@@ -1,0 +1,11 @@
+#!/bin/bash
+cd {{ djangoapp_code_dir }}
+source {{ djangoapp_app_dir }}/djangoapp_env
+
+# The default settings set in edxapp_env can be overridden
+# using the var $DJANGO_PLATFORM_SETTINGS_OVERRIDE
+
+if [[ -n "$DJANGO_PLATFORM_SETTINGS_OVERRIDE" ]]; then
+    export DJANGO_SETTINGS_MODULE="$DJANGO_PLATFORM_SETTINGS_OVERRIDE"
+fi
+

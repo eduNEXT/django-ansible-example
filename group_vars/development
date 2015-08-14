@@ -1,0 +1,9 @@
+mysql_root_password: root_dev
+
+web_user: vagrant
+disable_django_services: true
+shell_users: true
+
+
+DJANGOAPP_NGINX_PORT: 80
+DJANGOAPP_NGINX_HOSTNAME: django.app
